@@ -1,8 +1,14 @@
+#include <errno.h>
 #include <stdio.h>
 #include <signal.h>
 #include <stdlib.h>
-#include <winsock.h>
 #include <memory.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <asm-generic/errno-base.h>
+#include <unistd.h>
 
 #define MAX_CONNECTIONS 10
 
@@ -17,10 +23,9 @@ char buffer[BUFFER_SIZE];
 
 void mark_all_client_sockets_as_free();
 
-void
-EOC_s2s(int index) {
-    closesocket(client_socket[index]);
-    closesocket(remote_socket[index]);
+void EOC_s2s(int index) {
+    close(client_socket[index]);
+    close(remote_socket[index]);
     FD_CLR (client_socket[index], &mask);
     FD_CLR (remote_socket[index], &mask);
     client_socket_is_free[index] = 1;
@@ -29,75 +34,88 @@ EOC_s2s(int index) {
     fflush(stderr);
 }
 
-int
-main(int argc, char **argv) {
-    WSADATA wsa;
+void exit_with_sys_msg(const char* msg) {
+    perror(msg);
+    exit(1);
+}
 
-    printf("\nInitialising Winsock...");
-    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
-        printf("Failed. Error Code : %d", WSAGetLastError());
-        return 1;
-    }
+int create_server_socket(const u_char protocol_family, const enum __socket_type socket_type,  const u_char protocol) {
+    printf("Initializing socket...\n");
+    return socket(protocol_family, socket_type, protocol);
+}
 
-    printf("Initialised.");
+void apply_server_config(struct sockaddr_in* server, const char* local_port) {
+    memset(server, 0, sizeof (struct sockaddr_in));
+    server->sin_family = AF_INET;
+    server->sin_addr.s_addr = INADDR_ANY;
+    server->sin_port = htons(atoi(local_port));
+}
 
-    int request_socket, addrlen;
-    int index, count;
-    struct sockaddr_in server;
-    struct sockaddr_in remote;
-    struct hostent *remote_hostent;
-    char *remote_host;
-    char *remote_port;
-    char *local_port;
-    int nfound, maxfd;
-    struct timeval timeout;
+int main(const int argc, char **argv) {
 
-    if ((argc < 4) || (argc > 5)) {
+    printf("\n");
+
+    if (argc < 4 || argc > 5) {
         printf("Usage: socket2socket remote_host remote_port local_port\n\n");
         exit(1);
     }
-    remote_host = argv[1];
-    remote_port = argv[2];
-    local_port = argv[3];
 
-    if ((request_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        perror("socket");
-        exit(1);
+    printf("Initialised.\n");
+
+    int server_socket, addrlen;
+    int index, count;
+    struct sockaddr_in server;
+    struct sockaddr_in remote;
+    struct addrinfo hints, *res;
+    const char *remote_host = argv[1];
+    const char *remote_port = argv[2];
+    const char *local_port = argv[3];
+    struct timeval timeout;
+
+    if ( (server_socket = create_server_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
+        exit_with_sys_msg("Error opening socket");
     }
-    memset(&server, 0, sizeof server);
-    server.sin_family = AF_INET;
-    server.sin_addr.s_addr = INADDR_ANY;
-    server.sin_port = htons(atoi(local_port));
-    if ((bind(request_socket, (struct sockaddr *) &server, sizeof server)) < 0) {
-        perror("bind");
-        exit(1);
+
+    apply_server_config(&server, local_port);
+
+    const int opt = 1;
+    // Forcefully attach socket to the port (SO_REUSEADDR)
+    if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
+        exit_with_sys_msg("setsockopt failed");
     }
-    if (listen(request_socket, SOMAXCONN) < 0) {
-        perror("listen");
-        exit(1);
+
+    if ((bind(server_socket, (struct sockaddr *) &server, sizeof (server))) < 0) {
+        exit_with_sys_msg("bind");
     }
+
+    if (listen(server_socket, SOMAXCONN) < 0) {
+        exit_with_sys_msg("listen");
+    }
+
     printf("Listening in port %d\n", atoi(local_port));
-    printf("Press <Control+C> to Quit\n\n");
+    // printf("Press <Control+C> to Quit\n\n");
 
     mark_all_client_sockets_as_free();
+
     FD_ZERO(&mask);
-    FD_SET(request_socket, &mask);
-    maxfd = request_socket;
+    FD_SET(server_socket, &mask);
+
+    int maxfd = server_socket;
+
     while (1) {
         rmask = mask;
         timeout.tv_sec = 5;
         timeout.tv_usec = 0;
-        nfound = select(maxfd + 1, &rmask, NULL, NULL, &timeout);
+        const int nfound = select(maxfd + 1, &rmask, NULL, NULL, &timeout);
         if (nfound < 0) {
             if (errno == EINTR) {
                 printf("Interrupted by system call\n");
                 continue;
             }
-            perror("select");
-            exit(1);
+            exit_with_sys_msg("select");
         }
 
-        if (FD_ISSET(request_socket, &rmask)) {
+        if (FD_ISSET(server_socket, &rmask)) {
             addrlen = sizeof(remote);
             for (index = 0; index < MAX_CONNECTIONS; index++)
                 if (client_socket_is_free[index])
@@ -107,43 +125,55 @@ main(int argc, char **argv) {
             } else {
                 client_socket_is_free[index] = 0;
                 client_socket[index] =
-                        accept(request_socket, (struct sockaddr *) &remote, &addrlen);
+                        accept(server_socket, (struct sockaddr *) &remote, &addrlen);
+
                 if (client_socket[index] < 0) {
-                    perror("accept");
-                    exit(1);
+                    exit_with_sys_msg("accept");
                 }
+
                 printf("Connection request from %s, port %d\n",
                        inet_ntoa(remote.sin_addr), ntohs(remote.sin_port));
+
                 if (client_socket[index] > maxfd)
                     maxfd = client_socket[index];
+
                 printf("Connecting to remote host (%s:%s)\n", remote_host, remote_port);
+
                 if ((remote_socket[index] = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-                    perror("socket");
-                    exit(1);
+                    exit_with_sys_msg("socket");
                 }
+
                 if (remote_socket[index] > maxfd)
                     maxfd = remote_socket[index];
-                if ((remote_hostent = gethostbyname(remote_host)) == 0) {
-                    perror("gethostbyname");
-                    exit(1);
+
+                memset(&hints, 0, sizeof(hints));
+                hints.ai_family = AF_UNSPEC;
+                hints.ai_socktype = SOCK_STREAM;
+                hints.ai_protocol = IPPROTO_TCP;
+
+                if (getaddrinfo(remote_host, remote_port, &hints, &res) != 0) {
+                    exit_with_sys_msg("getaddrinfo");
                 }
-                memset(&remote, 0, sizeof remote);
-                remote.sin_family = AF_INET;
-                memcpy(&remote.sin_addr, remote_hostent->h_addr,
-                       remote_hostent->h_length);
-                remote.sin_port = htons(atoi(remote_port));
-                if (connect(remote_socket[index], (struct sockaddr *) &remote, sizeof remote) < 0) {
-                    closesocket(remote_socket[index]);
-                    printf("\n");
-                    perror("connect");
-                    exit(1);
+
+                const struct addrinfo *p = NULL;
+                for (p=res; p!= NULL; p=p->ai_next) {
+                    if (connect(remote_socket[index], p->ai_addr, p->ai_addrlen) == 0) {
+                        break;
+                    }
                 }
+
+                if (p==NULL) {
+                    close(remote_socket[index]);
+                    exit_with_sys_msg("connect");
+                }
+
                 printf("Bidirectional connection established\n");
                 printf("(%s:%s) <-> (localhost)\n", remote_host, remote_port);
                 FD_SET(remote_socket[index], &mask);
                 FD_SET(client_socket[index], &mask);
             }
         }
+
         for (index = 0; index < MAX_CONNECTIONS; index++) {
             if (!client_socket_is_free[index]) {
                 if (FD_ISSET(remote_socket[index], &rmask)) {
@@ -169,6 +199,7 @@ main(int argc, char **argv) {
                     }
                 }
             }
+
             if (!client_socket_is_free[index]) {
                 if (FD_ISSET(client_socket[index], &rmask)) {
                     printf("local -> remote (connection #%d)", index);
