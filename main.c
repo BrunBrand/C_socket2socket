@@ -177,7 +177,7 @@ int main(const int argc, char **argv) {
         for (index = 0; index < MAX_CONNECTIONS; index++) {
             if (!client_socket_is_free[index]) {
                 if (FD_ISSET(remote_socket[index], &rmask)) {
-                    printf("remote -> local (connection #%d) ", index);
+                    printf("remote ->  local (connection #%d) ", index);
                     fflush(stdout);
 
                     if ((count = recv(remote_socket[index], buffer, BUFFER_SIZE, 0)) == -1) {
