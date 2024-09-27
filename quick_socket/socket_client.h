@@ -15,6 +15,8 @@
 
 int setup_tcp_client_socket(const char *host, const char *port);
 
+// Opens a socket, sends a message and then closes
+void open_send_close(const char *host, const char* port, const char *message, int len);
 
 
 #endif //SOCKET_CLIENT_H

@@ -27,10 +27,19 @@ int setup_tcp_client_socket(const char *host, const char *port) {
 
 		if(connect(socket_client, addr->ai_addr, addr->ai_addrlen) == 0) break;
 
+		perror("connect");
 		close(socket_client);
 		socket_client = -1;
 	}
 
 	freeaddrinfo(servAddr);
 	return socket_client;
+}
+
+void open_send_close(const char *host, const char *port, const char *message, int len){
+	const int socket_client = setup_tcp_client_socket(host, port);
+
+   	if(send(socket_client, message, len, 0) <= 0) exit_with_sys_msg("send() failed");
+
+   	close(socket_client);
 }

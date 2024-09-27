@@ -23,25 +23,41 @@ int setup_tcp_server_socket(const char *port, int backlog) {
 
     int socket_server = -1;
 
-    for (const struct addrinfo *addr = server_addrinfo; addr != NULL; addr = addr->ai_next){
+    for (const struct addrinfo *addr = server_addrinfo; addr != NULL; addr = addr->ai_next) {
         socket_server = socket(server_addrinfo->ai_family, server_addrinfo->ai_socktype, server_addrinfo->ai_protocol);
         if(socket_server < 0) continue;
 
-        if((bind(socket_server, server_addrinfo->ai_addr, server_addrinfo->ai_addrlen) == 0) && (listen(socket_server, backlog) == 0)){
-            struct sockaddr_storage localAddr;
-            socklen_t addrSize = sizeof(localAddr);
-            if(getsockname(socket_server, (struct sockaddr*) &localAddr, &addrSize) < 0)
-                exit_with_sys_msg("getsockname() failed");
+        int opt = 1;
 
-            fputs("Binding to ", stdout);
-            print_socket_address((struct sockaddr*) &localAddr, stdout);
-            fputc('\n', stdout);
-            break;
+        if (setsockopt(socket_server, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0) {
+            perror("setsockopt(SO_REUSEPORT) failed");
+            exit(EXIT_FAILURE);
+        }
+        if((bind(socket_server, server_addrinfo->ai_addr, server_addrinfo->ai_addrlen) < 0)){
+            perror("bind");
+            socket_server = -1;
+            close(socket_server);
+            continue;
         }
 
-        close(socket_server);
-        socket_server = -1;
+        if ((listen(socket_server, SOMAXCONN) < 0)) {
+            perror("listen");
+            socket_server = -1;
+            close(socket_server);
+            continue;
+        }
+
+        struct sockaddr_storage localAddr;
+        socklen_t addrSize = sizeof(localAddr);
+        if(getsockname(socket_server, (struct sockaddr*) &localAddr, &addrSize) < 0)
+            exit_with_sys_msg("getsockname() failed");
+
+        fputs("Binding to ", stdout);
+        print_socket_address((struct sockaddr*) &localAddr, stdout);
+        fputc('\n', stdout);
+        break;
     }
+
     freeaddrinfo(server_addrinfo);
     return socket_server;
 }

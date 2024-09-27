@@ -3,11 +3,13 @@
 //
 
 #include "socket2socket_lib.h"
+#include "../quick_socket//socket_util.h"
 
 
 fd_set mask, rmask;
 
 char buffer[BUFFER_SIZE];
+char is_alive;
 
 unsigned char client_socket_is_free[MAX_CONNECTIONS];
 int client_socket[MAX_CONNECTIONS];
@@ -16,28 +18,27 @@ int remote_socket[MAX_CONNECTIONS];
 
 void run_server(const char *remote_host, const char *remote_port, const char *local_port) {
 
-    int server_socket, addrlen;
+    int socket_server, addrlen;
     struct sockaddr_in server;
     struct sockaddr_in remote;
     struct addrinfo hints, *res;
 
-    if ( (server_socket = create_server_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
+    if ( (socket_server = create_server_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
         exit_with_sys_msg("Error opening socket");
     }
 
     apply_server_config(&server, local_port);
+    int opt = 1;
 
-    const int opt = 1;
-    // Forcefully attach socket to the port (SO_REUSEADDR)
-    if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
-        exit_with_sys_msg("setsockopt failed");
+    if (setsockopt(socket_server, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0) {
+        perror("setsockopt(SO_REUSEPORT) failed");
+        exit(EXIT_FAILURE);
     }
-
-    if ((bind(server_socket, (struct sockaddr *) &server, sizeof (server))) < 0) {
+    if ((bind(socket_server, (struct sockaddr *) &server, sizeof (server))) < 0) {
         exit_with_sys_msg("bind");
     }
 
-    if (listen(server_socket, SOMAXCONN) < 0) {
+    if (listen(socket_server, SOMAXCONN) < 0) {
         exit_with_sys_msg("listen");
     }
 
@@ -47,11 +48,12 @@ void run_server(const char *remote_host, const char *remote_port, const char *lo
     mark_all_client_sockets_as_free();
 
     FD_ZERO(&mask);
-    FD_SET(server_socket, &mask);
+    FD_SET(socket_server, &mask);
 
-    int maxfd = server_socket;
+    int maxfd = socket_server;
 
-    while (1) {
+    is_alive = 1;
+    while (is_alive) {
         int index, count;
         rmask = mask;
         const int nfound = select(maxfd + 1, &rmask, NULL, NULL, &(struct timeval){.tv_sec = 5, .tv_usec = 0});
@@ -63,7 +65,7 @@ void run_server(const char *remote_host, const char *remote_port, const char *lo
             exit_with_sys_msg("select");
         }
 
-        if (FD_ISSET(server_socket, &rmask)) {
+        if (FD_ISSET(socket_server, &rmask)) {
             addrlen = sizeof(remote);
             for (index = 0; index < MAX_CONNECTIONS; index++)
                 if (client_socket_is_free[index])
@@ -73,7 +75,7 @@ void run_server(const char *remote_host, const char *remote_port, const char *lo
             } else {
                 client_socket_is_free[index] = 0;
                 client_socket[index] =
-                        accept(server_socket, (struct sockaddr *) &remote, &addrlen);
+                        accept(socket_server, (struct sockaddr *) &remote, &addrlen);
 
                 if (client_socket[index] < 0) {
                     exit_with_sys_msg("accept");
@@ -176,9 +178,8 @@ void run_server(const char *remote_host, const char *remote_port, const char *lo
     }
 }
 
-void exit_with_sys_msg(const char* msg) {
-    perror(msg);
-    exit(1);
+void stop_server() {
+    is_alive = 0;
 }
 
 int create_server_socket(const u_char protocol_family, const enum __socket_type socket_type,  const u_char protocol) {

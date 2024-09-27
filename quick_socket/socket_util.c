@@ -17,11 +17,11 @@ void print_socket_address(const struct sockaddr *addr, FILE *stream) {
     switch(addr->sa_family){
         case AF_INET:
             address_numeric = &((struct sockaddr_in *) addr)->sin_addr;
-        port = ntohs(((struct sockaddr_in *) addr)->sin_port);
+            port = ntohs(((struct sockaddr_in *) addr)->sin_port);
         break;
         case AF_INET6:
             address_numeric = &((struct sockaddr_in6 *) addr)->sin6_addr;
-        port = ntohs(((struct sockaddr_in6 *) addr)->sin6_port);
+            port = ntohs(((struct sockaddr_in6 *) addr)->sin6_port);
         break;
         default:
             fputs("[unknown type]", stream);

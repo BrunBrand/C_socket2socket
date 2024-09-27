@@ -28,7 +28,7 @@
 #include <netdb.h>
 #include <asm-generic/errno-base.h>
 #include <unistd.h>
-#include "src/socket2socket_lib/socket2socket_lib.h"
+#include "socket2socket_lib/socket2socket_lib.h"
 
 
 int main(const int argc, char **argv) {

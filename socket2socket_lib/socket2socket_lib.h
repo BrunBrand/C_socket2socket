@@ -22,6 +22,7 @@
 extern fd_set mask, rmask;
 
 extern char buffer[BUFFER_SIZE];
+extern char is_alive;
 
 extern unsigned char client_socket_is_free[MAX_CONNECTIONS];
 extern int client_socket[MAX_CONNECTIONS];
@@ -30,12 +31,12 @@ extern int remote_socket[MAX_CONNECTIONS];
 
 void run_server(const char *remote_host, const char *remote_port, const char *local_port);
 
+void stop_server();
 void apply_server_config(struct sockaddr_in* server, const char* local_port);
 int create_server_socket(const u_char protocol_family, const enum __socket_type socket_type, const u_char protocol);
 
 void EOC_s2s(const int index);
 
-void exit_with_sys_msg(const char* msg);
 void mark_all_client_sockets_as_free();
 
 #endif //SOCKET2SOCKET_LIB_H
