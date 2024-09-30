@@ -128,7 +128,6 @@ void manage_socket_in(struct server_connection *connection) {
 }
 
 void manage_socket_out(struct server_connection *connection) {
-    connection = get_next_nonfree_connection();
     if (connection->is_free != 0) return;
     if (!(FD_ISSET(connection->socket_client, &rmask))) return;
 
