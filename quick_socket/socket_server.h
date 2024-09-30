@@ -15,7 +15,7 @@
 
 
 // For server setup and configuration
-int setup_tcp_server_socket(const char *port, int backlog);
+int setup_tcp_server_socket(const char *port);
 
 // For handling clients
 int accept_tcp_conn(int socket_server);

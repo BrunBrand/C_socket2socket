@@ -25,18 +25,23 @@ extern char buffer[BUFFER_SIZE];
 extern char is_alive;
 
 extern unsigned char client_socket_is_free[MAX_CONNECTIONS];
-extern int client_socket[MAX_CONNECTIONS];
-extern int remote_socket[MAX_CONNECTIONS];
 
+struct server_connection {
+    int socket_client;
+    int socket_remote;
+    int index;
+    char is_free;
+}; // TODO move this definition to another place
+
+struct server_connections {
+    struct server_connection connections[MAX_CONNECTIONS];
+};
 
 void run_server(const char *remote_host, const char *remote_port, const char *local_port);
 
 void stop_server();
-void apply_server_config(struct sockaddr_in* server, const char* local_port);
-int create_server_socket(const u_char protocol_family, const enum __socket_type socket_type, const u_char protocol);
 
-void EOC_s2s(const int index);
-
+void EOC_s2s(struct server_connection* connection);
 void mark_all_client_sockets_as_free();
 
 #endif //SOCKET2SOCKET_LIB_H

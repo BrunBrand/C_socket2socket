@@ -21,7 +21,7 @@ void TestServer::start(){
 void TestServer::listen_for_messages() {
     reset_messages();
 
-    listener_socket = setup_tcp_server_socket(std::to_string(listening_port).c_str(), 5);
+    listener_socket = setup_tcp_server_socket(std::to_string(listening_port).c_str());
 
     initialized = true;
     int new_socket;

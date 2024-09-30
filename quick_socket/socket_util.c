@@ -4,6 +4,8 @@
 
 #include "socket_util.h"
 
+#include <string.h>
+
 
 void print_socket_address(const struct sockaddr *addr, FILE *stream) {
     if(addr == NULL || stream == NULL) return;
@@ -31,9 +33,14 @@ void print_socket_address(const struct sockaddr *addr, FILE *stream) {
     if(inet_ntop(addr->sa_family, address_numeric, address_buff, sizeof(address_buff)) == NULL){
         fputs("[invalid address]", stream);
     } else{
+
+        if (strcmp(address_buff, "0.0.0.0") == 0) {
+            strcpy(address_buff, "127.0.0.1");
+        }
+
         fprintf(stream, "%s", address_buff);
         if(port != 0){
-            fprintf(stream, "-%u", port);
+            fprintf(stream, ":%u", port);
         }
     }
 }

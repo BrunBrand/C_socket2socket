@@ -6,7 +6,7 @@
 
 
 
-int setup_tcp_server_socket(const char *port, int backlog) {
+int setup_tcp_server_socket(const char *port) {
     struct addrinfo hints = {0};
 
     hints.ai_family 	= AF_UNSPEC;
@@ -52,7 +52,7 @@ int setup_tcp_server_socket(const char *port, int backlog) {
         if(getsockname(socket_server, (struct sockaddr*) &localAddr, &addrSize) < 0)
             exit_with_sys_msg("getsockname() failed");
 
-        fputs("Binding to ", stdout);
+        fputs("Listening to ", stdout);
         print_socket_address((struct sockaddr*) &localAddr, stdout);
         fputc('\n', stdout);
         break;

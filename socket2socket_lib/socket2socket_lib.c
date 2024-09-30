@@ -4,57 +4,174 @@
 
 #include "socket2socket_lib.h"
 #include "../quick_socket//socket_util.h"
+#include "../quick_socket/socket_server.h"
 
 
 fd_set mask, rmask;
+int maxfd;
 
 char buffer[BUFFER_SIZE];
 char is_alive;
 
 unsigned char client_socket_is_free[MAX_CONNECTIONS];
-int client_socket[MAX_CONNECTIONS];
-int remote_socket[MAX_CONNECTIONS];
 
+struct server_connections server_conns;
+
+
+struct server_connection *get_next_free_connection() {
+    for (int i=0; i<MAX_CONNECTIONS; i++) {
+        if (server_conns.connections[i].is_free) {
+            return &server_conns.connections[i];
+        }
+    }
+    return NULL;
+}
+
+
+struct server_connection* get_next_nonfree_connection() {
+    for (int i=0; i<MAX_CONNECTIONS; i++) {
+        if (!server_conns.connections[i].is_free) {
+            return &server_conns.connections[i];
+        }
+    }
+    return NULL;
+}
+
+void check_for_new_client(const int socket_server, const char* remote_host, const char* remote_port, struct server_connection *connection) {
+    if (FD_ISSET(socket_server, &rmask)) {
+
+        struct sockaddr_in remote = {0};
+        struct addrinfo hints = {0}, *res = NULL;
+
+        socklen_t addrlen = sizeof(remote);
+
+        connection->is_free = 0;
+
+        connection->socket_client =
+            accept(
+                socket_server,
+                (struct sockaddr *) &remote,
+                &addrlen
+            );
+
+        if (connection->socket_client < 0) exit_with_sys_msg("accept");
+
+        printf("Connection request from %s, port %d\n",
+            inet_ntoa(remote.sin_addr),
+            ntohs(remote.sin_port)
+            );
+
+        if (connection->socket_client > maxfd) maxfd = connection->socket_client;
+
+        if ((connection->socket_remote = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+            exit_with_sys_msg("socket");
+        }
+
+        if (connection->socket_remote > maxfd) maxfd = connection->socket_remote;
+
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_protocol = IPPROTO_TCP;
+
+        if (getaddrinfo(remote_host, remote_port, &hints, &res) != 0) {
+            exit_with_sys_msg("getaddrinfo");
+        }
+
+        const struct addrinfo *p = NULL;
+        for (p=res; p!= NULL; p=p->ai_next) {
+            if (connect(connection->socket_remote, p->ai_addr, p->ai_addrlen) == 0) {
+                break;
+            }
+        }
+
+        if (p==NULL) {
+            close(connection->socket_remote);
+            exit_with_sys_msg("connect");
+        }
+
+        printf("Bidirectional connection established\n");
+        printf("(%s:%s) <-> (localhost)\n", remote_host, remote_port);
+        FD_SET(connection->socket_remote, &mask);
+        FD_SET(connection->socket_client, &mask);
+
+
+    }
+}
+
+
+void manage_socket_in(struct server_connection *connection) {
+    if (connection->is_free != 0) return;
+
+    if (!(FD_ISSET(connection->socket_remote, &rmask))) return;
+
+    printf("remote -> local (connection #%d) ", connection->index);
+    fflush(stdout);
+
+    size_t count;
+    if ((count = recv(connection->socket_remote, buffer, BUFFER_SIZE, 0)) == -1) {
+        perror("read");
+        EOC_s2s(connection);
+    } else {
+        if (count == 0) {
+            EOC_s2s(connection);
+        } else {
+            if ((count = send(connection->socket_client, buffer, count, 0)) == -1) {
+                perror("write");
+                fflush(stderr);
+                EOC_s2s(connection);
+            } else {
+                printf("%lu Bytes\n", count);
+                fflush(stdout);
+            }
+        }
+    }
+}
+
+void manage_socket_out(struct server_connection *connection) {
+    connection = get_next_nonfree_connection();
+    if (connection->is_free != 0) return;
+    if (!(FD_ISSET(connection->socket_client, &rmask))) return;
+
+    printf("local -> remote (connection #%d ) ", connection->index);
+    fflush(stdout);
+
+    size_t count;
+    if ((count = recv(connection->socket_client, buffer, sizeof(buffer), 0)) == -1) {
+        perror("read");
+        EOC_s2s(connection);
+    } else {
+        if (count == 0) {
+            EOC_s2s(connection);
+        } else {
+            if ((count = send(connection->socket_remote, buffer, count, 0)) == -1) {
+                perror("write");
+                EOC_s2s(connection);
+            } else {
+                printf("%lu bytes\n", count);
+                fflush(stdout);
+            }
+        }
+    }
+}
 
 void run_server(const char *remote_host, const char *remote_port, const char *local_port) {
 
-    int socket_server, addrlen;
-    struct sockaddr_in server;
-    struct sockaddr_in remote;
-    struct addrinfo hints, *res;
-
-    if ( (socket_server = create_server_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
-        exit_with_sys_msg("Error opening socket");
+    for (int i = 0; i < MAX_CONNECTIONS; i++) {
+        server_conns.connections[i].index = i;
     }
 
-    apply_server_config(&server, local_port);
-    int opt = 1;
-
-    if (setsockopt(socket_server, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0) {
-        perror("setsockopt(SO_REUSEPORT) failed");
-        exit(EXIT_FAILURE);
-    }
-    if ((bind(socket_server, (struct sockaddr *) &server, sizeof (server))) < 0) {
-        exit_with_sys_msg("bind");
-    }
-
-    if (listen(socket_server, SOMAXCONN) < 0) {
-        exit_with_sys_msg("listen");
-    }
-
-    printf("Listening in port %d\n", atoi(local_port));
-    // printf("Press <Control+C> to Quit\n\n");
+    const int socket_server = setup_tcp_server_socket(local_port);
 
     mark_all_client_sockets_as_free();
 
     FD_ZERO(&mask);
     FD_SET(socket_server, &mask);
 
-    int maxfd = socket_server;
-
     is_alive = 1;
+
+    maxfd = socket_server;
+
     while (is_alive) {
-        int index, count;
         rmask = mask;
         const int nfound = select(maxfd + 1, &rmask, NULL, NULL, &(struct timeval){.tv_sec = 5, .tv_usec = 0});
         if (nfound < 0) {
@@ -65,141 +182,39 @@ void run_server(const char *remote_host, const char *remote_port, const char *lo
             exit_with_sys_msg("select");
         }
 
-        if (FD_ISSET(socket_server, &rmask)) {
-            addrlen = sizeof(remote);
-            for (index = 0; index < MAX_CONNECTIONS; index++)
-                if (client_socket_is_free[index])
-                    break;
-            if (index == MAX_CONNECTIONS) {
-                printf("There are no connections available at this time\n");
-            } else {
-                client_socket_is_free[index] = 0;
-                client_socket[index] =
-                        accept(socket_server, (struct sockaddr *) &remote, &addrlen);
+        struct server_connection *connection = NULL;
 
-                if (client_socket[index] < 0) {
-                    exit_with_sys_msg("accept");
-                }
-
-                printf("Connection request from %s, port %d\n",
-                       inet_ntoa(remote.sin_addr), ntohs(remote.sin_port));
-
-                if (client_socket[index] > maxfd)
-                    maxfd = client_socket[index];
-
-                printf("Connecting to remote host (%s:%s)\n", remote_host, remote_port);
-
-                if ((remote_socket[index] = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-                    exit_with_sys_msg("socket");
-                }
-
-                if (remote_socket[index] > maxfd)
-                    maxfd = remote_socket[index];
-
-                memset(&hints, 0, sizeof(hints));
-                hints.ai_family = AF_UNSPEC;
-                hints.ai_socktype = SOCK_STREAM;
-                hints.ai_protocol = IPPROTO_TCP;
-
-                if (getaddrinfo(remote_host, remote_port, &hints, &res) != 0) {
-                    exit_with_sys_msg("getaddrinfo");
-                }
-
-                const struct addrinfo *p = NULL;
-                for (p=res; p!= NULL; p=p->ai_next) {
-                    if (connect(remote_socket[index], p->ai_addr, p->ai_addrlen) == 0) {
-                        break;
-                    }
-                }
-
-                if (p==NULL) {
-                    close(remote_socket[index]);
-                    exit_with_sys_msg("connect");
-                }
-
-                printf("Bidirectional connection established\n");
-                printf("(%s:%s) <-> (localhost)\n", remote_host, remote_port);
-                FD_SET(remote_socket[index], &mask);
-                FD_SET(client_socket[index], &mask);
+        if ((connection = get_next_free_connection()) == NULL) {
+            printf("There are no connections available at this time\n");
+        } else {
+            if (FD_ISSET(socket_server, &rmask)) {
+                check_for_new_client(socket_server, remote_host, remote_port, connection);
             }
         }
 
-        for (index = 0; index < MAX_CONNECTIONS; index++) {
-            if (!client_socket_is_free[index]) {
-                if (FD_ISSET(remote_socket[index], &rmask)) {
-                    printf("remote -> local (connection #%d) ", index);
-                    fflush(stdout);
-
-                    if ((count = recv(remote_socket[index], buffer, BUFFER_SIZE, 0)) == -1) {
-                        perror("read");
-                        EOC_s2s(index);
-                    } else {
-                        if (count == 0) {
-                            EOC_s2s(index);
-                        } else {
-                            if ((count = send(client_socket[index], buffer, count, 0)) == -1) {
-                                perror("write");
-                                fflush(stderr);
-                                EOC_s2s(index);
-                            } else {
-                                printf(" %d Bytes\n", count);
-                                fflush(stdout);
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (!client_socket_is_free[index]) {
-                if (FD_ISSET(client_socket[index], &rmask)) {
-                    printf("local -> remote (connection #%d)", index);
-                    fflush(stdout);
-                    if ((count = recv(client_socket[index], buffer, sizeof(buffer), 0)) == -1) {
-                        perror("read");
-                        EOC_s2s(index);
-                    } else {
-                        if (count == 0) {
-                            EOC_s2s(index);
-                        } else {
-                            if ((count = send(remote_socket[index], buffer, count, 0)) == -1) {
-                                perror("write");
-                                EOC_s2s(index);
-                            } else {
-                                printf(" %d bytes\n", count);
-                                fflush(stdout);
-                            }
-                        }
-                    }
-                }
-            }
+        if ((connection = get_next_nonfree_connection()) != NULL) {
+            manage_socket_in(connection);
+            manage_socket_out(connection);
         }
+
         fflush(stdout);
         fflush(stderr);
     }
+    close(socket_server);
 }
 
 void stop_server() {
     is_alive = 0;
 }
 
-int create_server_socket(const u_char protocol_family, const enum __socket_type socket_type,  const u_char protocol) {
-    printf("Initializing socket...\n");
-    return socket(protocol_family, socket_type, protocol);
-}
-
-void apply_server_config(struct sockaddr_in* server, const char* local_port) {
-    memset(server, 0, sizeof (struct sockaddr_in));
-    server->sin_family = AF_INET;
-    server->sin_addr.s_addr = INADDR_ANY;
-    server->sin_port = htons(atoi(local_port));
-}
-
-void EOC_s2s(const int index) {
-    close(client_socket[index]);
-    close(remote_socket[index]);
-    FD_CLR (client_socket[index], &mask);
-    FD_CLR (remote_socket[index], &mask);
-    client_socket_is_free[index] = 1;
+void EOC_s2s(struct server_connection *connection) {
+    close(connection->socket_client);
+    close(connection->socket_remote);
+    FD_CLR (connection->socket_client, &mask);
+    FD_CLR (connection->socket_remote, &mask);
+    connection->socket_remote = -1;
+    connection->socket_client = -1;
+    connection->is_free = 1;
     printf("End of connection\n");
     fflush(stdout);
     fflush(stderr);
@@ -208,6 +223,6 @@ void EOC_s2s(const int index) {
 
 void mark_all_client_sockets_as_free() {
     for (int index = 0; index < MAX_CONNECTIONS; index++) {
-        client_socket_is_free[index] = 1;
+        server_conns.connections[index].is_free = 1;
     }
 }
