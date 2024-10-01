@@ -4,7 +4,7 @@
 
 #include "socket_client.h"
 
-int setup_tcp_client_socket(const char *host, const char *port) {
+SOCKET setup_tcp_client_socket(const char *host, const char *port) {
 
 	struct addrinfo hints={0};
 
@@ -19,17 +19,18 @@ int setup_tcp_client_socket(const char *host, const char *port) {
 		exit_with_user_msg("getaddrinfo() failed", gai_strerror(value));
 	}
 
-	int socket_client = -1;
+	int socket_client = INVALID_SOCKET;
 
 	for(const struct addrinfo *addr = servAddr; addr != NULL; addr = addr->ai_next){
-		socket_client = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
-		if(socket_client < 0) continue;
+
+		if ((socket_client = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol)) == INVALID_SOCKET)
+			continue;
 
 		if(connect(socket_client, addr->ai_addr, addr->ai_addrlen) == 0) break;
 
 		perror("connect");
-		close(socket_client);
-		socket_client = -1;
+		CLOSESOCKET(socket_client);
+		socket_client = INVALID_SOCKET;
 	}
 
 	freeaddrinfo(servAddr);
@@ -37,9 +38,9 @@ int setup_tcp_client_socket(const char *host, const char *port) {
 }
 
 void open_send_close(const char *host, const char *port, const char *message, int len){
-	const int socket_client = setup_tcp_client_socket(host, port);
+	const SOCKET socket_client = setup_tcp_client_socket(host, port);
 
    	if(send(socket_client, message, len, 0) <= 0) exit_with_sys_msg("send() failed");
 
-   	close(socket_client);
+   	CLOSESOCKET(socket_client);
 }

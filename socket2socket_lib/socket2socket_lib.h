@@ -9,12 +9,15 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <memory.h>
+#include <stdbool.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#include <asm-generic/errno-base.h>
 #include <unistd.h>
+#include "../quick_socket/portable_sockets.h"
+#include "../quick_socket/socket_util.h"
+#include "../quick_socket/socket_server.h"
 
 #define MAX_CONNECTIONS 10
 #define BUFFER_SIZE 1500
@@ -27,11 +30,10 @@ extern char is_alive;
 extern unsigned char client_socket_is_free[MAX_CONNECTIONS];
 
 struct server_connection {
-    int socket_client;
-    int socket_remote;
-    int index;
+    SOCKET socket_client;
+    SOCKET socket_remote;
     char is_free;
-}; // TODO move this definition to another place
+};
 
 struct server_connections {
     struct server_connection connections[MAX_CONNECTIONS];

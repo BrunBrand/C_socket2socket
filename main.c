@@ -26,12 +26,19 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#include <asm-generic/errno-base.h>
 #include <unistd.h>
 #include "socket2socket_lib/socket2socket_lib.h"
 
 
 int main(const int argc, char **argv) {
+
+
+#ifdef _WIN32
+    WSADATA d;
+    if(WSAStartup(MAKEWORD(2,2), &d)){
+        Error("Failed to initialize");
+    }
+#endif
 
     printf("\n");
 
@@ -48,6 +55,9 @@ int main(const int argc, char **argv) {
 
     run_server(remote_host, remote_port, local_port);
 
+#ifdef _WIN32
+    WSACleanup();
+#endif
 
     exit(0);
 }

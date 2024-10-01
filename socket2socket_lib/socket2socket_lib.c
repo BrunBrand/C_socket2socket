@@ -3,8 +3,7 @@
 //
 
 #include "socket2socket_lib.h"
-#include "../quick_socket//socket_util.h"
-#include "../quick_socket/socket_server.h"
+
 
 
 fd_set mask, rmask;
@@ -16,7 +15,6 @@ char is_alive;
 unsigned char client_socket_is_free[MAX_CONNECTIONS];
 
 struct server_connections server_conns;
-
 
 struct server_connection *get_next_free_connection() {
     for (int i=0; i<MAX_CONNECTIONS; i++) {
@@ -37,12 +35,10 @@ struct server_connection* get_next_nonfree_connection() {
     return NULL;
 }
 
-void check_for_new_client(const int socket_server, const char* remote_host, const char* remote_port, struct server_connection *connection) {
+void check_for_new_client(const SOCKET socket_server, const char* remote_host, const char* remote_port, struct server_connection *connection) {
     if (FD_ISSET(socket_server, &rmask)) {
 
         struct sockaddr_in remote = {0};
-        struct addrinfo hints = {0}, *res = NULL;
-
         socklen_t addrlen = sizeof(remote);
 
         connection->is_free = 0;
@@ -54,7 +50,7 @@ void check_for_new_client(const int socket_server, const char* remote_host, cons
                 &addrlen
             );
 
-        if (connection->socket_client < 0) exit_with_sys_msg("accept");
+        if (connection->socket_client  == INVALID_SOCKET) exit_with_sys_msg("accept");
 
         printf("Connection request from %s, port %d\n",
             inet_ntoa(remote.sin_addr),
@@ -63,11 +59,14 @@ void check_for_new_client(const int socket_server, const char* remote_host, cons
 
         if (connection->socket_client > maxfd) maxfd = connection->socket_client;
 
-        if ((connection->socket_remote = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        if ((connection->socket_remote = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
             exit_with_sys_msg("socket");
         }
 
         if (connection->socket_remote > maxfd) maxfd = connection->socket_remote;
+
+        struct addrinfo hints = {0};
+        struct addrinfo *res = NULL;
 
         hints.ai_family = AF_UNSPEC;
         hints.ai_socktype = SOCK_STREAM;
@@ -85,7 +84,7 @@ void check_for_new_client(const int socket_server, const char* remote_host, cons
         }
 
         if (p==NULL) {
-            close(connection->socket_remote);
+            CLOSESOCKET(connection->socket_remote);
             exit_with_sys_msg("connect");
         }
 
@@ -104,7 +103,7 @@ void manage_socket_in(struct server_connection *connection) {
 
     if (!(FD_ISSET(connection->socket_remote, &rmask))) return;
 
-    printf("remote -> local (connection #%d) ", connection->index);
+    // printf("remote -> local (connection #%d) ", connection->index);
     fflush(stdout);
 
     size_t count;
@@ -131,7 +130,7 @@ void manage_socket_out(struct server_connection *connection) {
     if (connection->is_free != 0) return;
     if (!(FD_ISSET(connection->socket_client, &rmask))) return;
 
-    printf("local -> remote (connection #%d ) ", connection->index);
+    // printf("local -> remote (connection #%d ) ", connection->index);
     fflush(stdout);
 
     size_t count;
@@ -155,11 +154,7 @@ void manage_socket_out(struct server_connection *connection) {
 
 void run_server(const char *remote_host, const char *remote_port, const char *local_port) {
 
-    for (int i = 0; i < MAX_CONNECTIONS; i++) {
-        server_conns.connections[i].index = i;
-    }
-
-    const int socket_server = setup_tcp_server_socket(local_port);
+    const SOCKET socket_server = setup_tcp_server_socket(local_port);
 
     mark_all_client_sockets_as_free();
 
@@ -170,6 +165,7 @@ void run_server(const char *remote_host, const char *remote_port, const char *lo
 
     maxfd = socket_server;
 
+    // ReSharper disable once CppDFALoopConditionNotUpdated
     while (is_alive) {
         rmask = mask;
         const int nfound = select(maxfd + 1, &rmask, NULL, NULL, &(struct timeval){.tv_sec = 5, .tv_usec = 0});
@@ -186,9 +182,7 @@ void run_server(const char *remote_host, const char *remote_port, const char *lo
         if ((connection = get_next_free_connection()) == NULL) {
             printf("There are no connections available at this time\n");
         } else {
-            if (FD_ISSET(socket_server, &rmask)) {
-                check_for_new_client(socket_server, remote_host, remote_port, connection);
-            }
+            check_for_new_client(socket_server, remote_host, remote_port, connection);
         }
 
         if ((connection = get_next_nonfree_connection()) != NULL) {
@@ -199,7 +193,7 @@ void run_server(const char *remote_host, const char *remote_port, const char *lo
         fflush(stdout);
         fflush(stderr);
     }
-    close(socket_server);
+    CLOSESOCKET(socket_server);
 }
 
 void stop_server() {
@@ -207,13 +201,13 @@ void stop_server() {
 }
 
 void EOC_s2s(struct server_connection *connection) {
-    close(connection->socket_client);
-    close(connection->socket_remote);
+    CLOSESOCKET(connection->socket_client);
+    CLOSESOCKET(connection->socket_remote);
     FD_CLR (connection->socket_client, &mask);
     FD_CLR (connection->socket_remote, &mask);
-    connection->socket_remote = -1;
-    connection->socket_client = -1;
-    connection->is_free = 1;
+    connection->socket_remote = INVALID_SOCKET;
+    connection->socket_client = INVALID_SOCKET;
+    connection->is_free = true;
     printf("End of connection\n");
     fflush(stdout);
     fflush(stderr);

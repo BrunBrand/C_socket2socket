@@ -12,8 +12,9 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include "socket_util.h"
+#include "portable_sockets.h"
 
-int setup_tcp_client_socket(const char *host, const char *port);
+SOCKET setup_tcp_client_socket(const char *host, const char *port);
 
 // Opens a socket, sends a message and then closes
 void open_send_close(const char *host, const char* port, const char *message, int len);

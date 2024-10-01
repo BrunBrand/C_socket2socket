@@ -11,7 +11,6 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
-#define ISVALIDSOCKET(s) ((s) != INVALID_SOCKET)
 #define CLOSESOCKET(s) closesocket(s)
 #define GETSOCKETERRNO() (WSAGetLastError())
 #ifndef IPV6_V6ONLY
@@ -25,7 +24,7 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <errno.h>
-#define ISVALIDSOCKET(s) ((s) >= 0)
+#define INVALID_SOCKET (-1)
 #define CLOSESOCKET(s) close(s)
 #define SOCKET int
 #define GETSOCKETERRNO() (errno)

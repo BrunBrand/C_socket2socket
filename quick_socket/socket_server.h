@@ -12,13 +12,13 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include "socket_util.h"
-
+#include "portable_sockets.h"
 
 // For server setup and configuration
-int setup_tcp_server_socket(const char *port);
+SOCKET setup_tcp_server_socket(const char *port);
 
 // For handling clients
-int accept_tcp_conn(int socket_server);
+SOCKET accept_tcp_conn(SOCKET socket_server);
 void recv_block(int socket_client);
 
 // TODO maybe create rcv_nonblock
