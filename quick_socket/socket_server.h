@@ -8,9 +8,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
 #include "socket_util.h"
 #include "portable_sockets.h"
 
@@ -19,7 +16,7 @@ SOCKET setup_tcp_server_socket(const char *port);
 
 // For handling clients
 SOCKET accept_tcp_conn(SOCKET socket_server);
-void recv_block(int socket_client);
+void recv_block(SOCKET socket_client);
 
 // TODO maybe create rcv_nonblock
 

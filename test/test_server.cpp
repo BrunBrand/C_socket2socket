@@ -1,5 +1,4 @@
 
-#include <sys/socket.h>
 #include "test_server.hpp"
 
 extern "C"{

@@ -7,8 +7,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <netdb.h>
-#include <arpa/inet.h>
+#include "portable_sockets.h"
 
 void print_socket_address(const struct sockaddr *addr, FILE *stream);
 

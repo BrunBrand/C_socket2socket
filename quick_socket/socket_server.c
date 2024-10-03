@@ -27,9 +27,9 @@ SOCKET setup_tcp_server_socket(const char *port) {
 
         if(socket_server == INVALID_SOCKET) continue;
 
-        int opt = 1;
+        char *opt;
 
-        if (setsockopt(socket_server, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0) {
+        if (setsockopt(socket_server, SOL_SOCKET, SO_REUSEADDR, opt, sizeof(opt)) < 0) {
             perror("setsockopt(SO_REUSEPORT) failed");
             exit(EXIT_FAILURE);
         }
@@ -63,7 +63,7 @@ SOCKET setup_tcp_server_socket(const char *port) {
     return socket_server;
 }
 
-SOCKET accept_tcp_conn(const int socket_server) {
+SOCKET accept_tcp_conn(const SOCKET socket_server) {
     struct sockaddr_storage client;
 
     socklen_t client_len = sizeof(client);

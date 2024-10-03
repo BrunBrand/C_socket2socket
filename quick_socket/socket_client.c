@@ -19,7 +19,7 @@ SOCKET setup_tcp_client_socket(const char *host, const char *port) {
 		exit_with_user_msg("getaddrinfo() failed", gai_strerror(value));
 	}
 
-	int socket_client = INVALID_SOCKET;
+	SOCKET socket_client = INVALID_SOCKET;
 
 	for(const struct addrinfo *addr = servAddr; addr != NULL; addr = addr->ai_next){
 

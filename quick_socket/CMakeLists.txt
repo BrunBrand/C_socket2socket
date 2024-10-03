@@ -13,3 +13,4 @@ set(
 )
 
 add_library(quick_socket SHARED ${HEADER_FILES} ${SOURCE_FILES})
+target_link_libraries(quick_socket ws2_32.lib)

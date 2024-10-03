@@ -8,7 +8,7 @@
 #include <iostream>
 #include <string>
 #include <thread>
-#include <netinet/in.h>
+#include "../quick_socket/portable_sockets.h"
 
 class TestServer {
 private:

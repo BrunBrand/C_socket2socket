@@ -10,10 +10,6 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <stdbool.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <netdb.h>
 #include <unistd.h>
 #include "../quick_socket/portable_sockets.h"
 #include "../quick_socket/socket_util.h"

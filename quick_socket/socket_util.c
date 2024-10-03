@@ -14,7 +14,7 @@ void print_socket_address(const struct sockaddr *addr, FILE *stream) {
 
     char address_buff[INET6_ADDRSTRLEN];
 
-    in_port_t port;
+    intptr_t port;
 
     switch(addr->sa_family){
         case AF_INET:

@@ -7,10 +7,6 @@
 
 #include <string.h>
 #include <stdio.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
 #include "socket_util.h"
 #include "portable_sockets.h"
 

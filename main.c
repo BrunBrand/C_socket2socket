@@ -22,11 +22,6 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <memory.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <unistd.h>
 #include "socket2socket_lib/socket2socket_lib.h"
 
 
@@ -36,7 +31,7 @@ int main(const int argc, char **argv) {
 #ifdef _WIN32
     WSADATA d;
     if(WSAStartup(MAKEWORD(2,2), &d)){
-        Error("Failed to initialize");
+        exit_with_sys_msg("Failed to initialize");
     }
 #endif
 
