@@ -69,15 +69,3 @@ TEST_CASE_METHOD(
         REQUIRE_THAT(test_server.get_messages(), Equals("message1 message2"));
     }
 }
-
-//
-//
-// TEST_CASE_METHOD(
-//     TestSocket2SocketFixture,
-//     "2Send message to port 1 --> message arrives at server listening on port 2",
-//     "[E2E][Send]") {
-//
-//     TestServer test_server(2222);
-//     test_server.start();
-//
-// }

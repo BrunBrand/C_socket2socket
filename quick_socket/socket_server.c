@@ -27,9 +27,9 @@ SOCKET setup_tcp_server_socket(const char *port) {
 
         if(socket_server == INVALID_SOCKET) continue;
 
-        char *opt;
+        int opt = -1;
 
-        if (setsockopt(socket_server, SOL_SOCKET, SO_REUSEADDR, opt, sizeof(opt)) < 0) {
+        if (setsockopt(socket_server, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0) {
             perror("setsockopt(SO_REUSEPORT) failed");
             exit(EXIT_FAILURE);
         }
