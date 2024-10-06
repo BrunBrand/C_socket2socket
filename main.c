@@ -28,23 +28,41 @@
 static GtkBuilder *builder = NULL;
 static gboolean server_running = FALSE;
 
+typedef struct {
+    const char *remote_addr;
+    const char *remote_port;
+    const char *local_port;
+} ServerConfig;
+
+gpointer server_fn(gpointer data) {
+    const ServerConfig conf = *(ServerConfig*)data;
+    run_server(conf.remote_addr, conf.remote_port, conf.local_port);
+    return NULL;
+}
 
 static void on_server_button_clicked(GtkWidget *widget, gpointer data) {
     GObject *textw1 = gtk_builder_get_object(builder, "textw1");
     GObject *textw2 = gtk_builder_get_object(builder, "textw2");
     GObject *textw3 = gtk_builder_get_object(builder, "textw3");
 
+    ServerConfig conf = {
+        .remote_addr = gtk_entry_buffer_get_text(gtk_entry_get_buffer(GTK_ENTRY(textw1))),
+        .remote_port = gtk_entry_buffer_get_text(gtk_entry_get_buffer(GTK_ENTRY(textw2))),
+        .local_port = gtk_entry_buffer_get_text(gtk_entry_get_buffer(GTK_ENTRY(textw3)))
+    };
 
-    const char* remote_address = gtk_entry_buffer_get_text(gtk_entry_get_buffer(GTK_ENTRY(textw1)));
-    const char* remote_port = gtk_entry_buffer_get_text(gtk_entry_get_buffer(GTK_ENTRY(textw2)));
-    const char* local_port = gtk_entry_buffer_get_text(gtk_entry_get_buffer(GTK_ENTRY(textw3)));
+    static GThread *thread = NULL;
 
     if (server_running) {
-        gtk_button_set_label(GTK_BUTTON(widget), "Start Server");
+        stop_server();
+        if (thread != NULL) {
+            g_thread_join(thread);
+        }
         server_running = FALSE;
+        gtk_button_set_label(GTK_BUTTON(widget), "Start Server");
     } else {
+        thread = g_thread_new("server_thread", server_fn, &conf);
         gtk_button_set_label(GTK_BUTTON(widget), "Stop Server");
-        run_server(remote_address, remote_port, local_port);
         server_running = TRUE;
     }
 }

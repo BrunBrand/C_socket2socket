@@ -197,6 +197,10 @@ void run_server(const char *remote_host, const char *remote_port, const char *lo
 }
 
 void stop_server() {
+    printf("Server is Stopping\n");
+    for (int i=0; i<MAX_CONNECTIONS; i++) {
+        EOC_s2s(&server_conns.connections[i]);
+    }
     is_alive = 0;
 }
 
