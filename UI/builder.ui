@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+    <object id="window" class="GtkWindow">
+        <property name="title">Grid</property>
+        <child>
+            <object id="grid" class="GtkGrid">
+                <property name="column-spacing">16</property>
+                <property name="row-spacing">16</property>
+                <child>
+                    <object id="label1" class="GtkLabel">
+                        <property name="label">Remote Server Address</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="wrap">true</property>
+                        <layout>
+                            <property name="column">1</property>
+                            <property name="row">0</property>
+                            <property name="column-span">1</property>
+                        </layout>
+                    </object>
+                </child>
+                <child>
+                    <object id="label2" class="GtkLabel">
+                        <property name="label">Remote Server Port</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="wrap">true</property>
+                        <layout>
+                            <property name="column">1</property>
+                            <property name="row">1</property>
+                            <property name="column-span">1</property>
+                        </layout>
+                    </object>
+                </child>
+                <child>
+                    <object id="label3" class="GtkLabel">
+                        <property name="label">Local Port</property>
+                        <property name="halign">end</property>
+                        <property name="valign">center</property>
+                        <property name="wrap">true</property>
+                        <layout>
+                            <property name="column">1</property>
+                            <property name="row">2</property>
+                            <property name="column-span">1</property>
+                        </layout>
+                    </object>
+                </child>
+                <child>
+                    <object id="textw1" class="GtkEntry">
+                        <layout>
+                            <property name="column">2</property>
+                            <property name="row">0</property>
+                            <property name="column-span">1</property>
+                        </layout>
+                    </object>
+                </child>
+                <child>
+                    <object id="textw2" class="GtkEntry">
+                        <layout>
+                            <property name="column">2</property>
+                            <property name="row">1</property>
+                            <property name="column-span">1</property>
+                        </layout>
+                    </object>
+                </child>
+                <child>
+                    <object id="textw3" class="GtkEntry">
+                        <layout>
+                            <property name="column">2</property>
+                            <property name="row">2</property>
+                            <property name="column-span">1</property>
+                        </layout>
+                    </object>
+                </child>
+                <child>
+                    <object id="button1" class="GtkToggleButton">
+                        <property name="label">Start Server</property>
+                        <layout>
+                            <property name="column">2</property>
+                            <property name="row">3</property>
+                            <property name="column-span">1</property>
+                        </layout>
+                    </object>
+                </child>
+            </object>
+        </child>
+    </object>
+</interface>
